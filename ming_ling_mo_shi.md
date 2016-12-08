@@ -1,4 +1,4 @@
-# 命令模式
+## 命令模式
 命令模式是我最爱的设计模式之一。在很多我写过的大型程序里，命令模式都随处可以。他可以让一些原来丑陋的代码变得十分整洁。然而对于这样一个优秀的设计的模式，GOF给出的解释却十分晦涩。
 
 >  a request as an object, thereby letting users parameterize clients with different requests, queue or log requests, and support undoable operations.  
@@ -150,5 +150,6 @@ if (command)
 
 > 如果我们对这些命令进行序列化，我们就可以在网络上发送它们。我们可以拿到用户的输入，发送到另一台机器上，并且重现它，这是网络多人游戏的基础。
 
+## 撤销和重做
 
 
