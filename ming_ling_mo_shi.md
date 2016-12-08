@@ -43,4 +43,22 @@ public:
   virtual void execute() = 0;
 };
 ```
+> 当你有一个接口只有一个没有返回值的方法的时候，这是一个用命令模式的绝佳机会
+
+然后我们再为不同的游戏行为定义不同的子类
+```cpp
+class JumpCommand : public Command
+{
+public:
+  virtual void execute() { jump(); }
+};
+
+class FireCommand : public Command
+{
+public:
+  virtual void execute() { fireGun(); }
+};
+// You get the idea...
+```
+
 
