@@ -16,3 +16,31 @@
 > 命令模式以面向对象的方式取代了回调函数
 
 用这句话去解释命令模式比GOF之前的定义更加贴切。但无论怎讲解释，这些定义依然是十分抽象的，还是让我们用一些实际的例子来理解命令模式吧。
+
+## 输入配置
+在游戏代码中，我们经常需要一堆代码来处理用户输入，包括按钮、键盘、鼠标等，这些代码将用户输入转换成游戏中有意义的行为。
+![](command-buttons-one.png)
+一个简单实现如下：
+```cpp
+void InputHandler::handleInput()
+{
+  if (isPressed(BUTTON_X)) jump();
+  else if (isPressed(BUTTON_Y)) fireGun();
+  else if (isPressed(BUTTON_A)) swapWeapon();
+  else if (isPressed(BUTTON_B)) lurchIneffectively();
+}
+```
+这个函数一般会在游戏中每帧调用一次，其作用也很容易理解。但是这段代码将按键和行为进行了硬编码，导致玩家无法在游戏中实现自定义按键。
+
+为了实现自定义按键功能，我们将jump()和fireGun()这些直接的调用进行转变，使用对象来封装这些行为。进入：命令模式。
+
+我们定义了一个基类表示一个可触发的游戏命令：
+```cpp
+class Command
+{
+public:
+  virtual ~Command() {}
+  virtual void execute() = 0;
+};
+```
+
