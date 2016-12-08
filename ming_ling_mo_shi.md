@@ -60,5 +60,88 @@ public:
 };
 // You get the idea...
 ```
+在我们的InputHandler里，为每个按键都存了一个到命令的指针。
+```cpp
+class InputHandler
+{
+public:
+  void handleInput();
+
+  // Methods to bind commands...
+
+private:
+  Command* buttonX_;
+  Command* buttonY_;
+  Command* buttonA_;
+  Command* buttonB_;
+};
+```
+现在的输入部分是这样的
+```cpp
+void InputHandler::handleInput()
+{
+  if (isPressed(BUTTON_X)) buttonX_->execute();
+  else if (isPressed(BUTTON_Y)) buttonY_->execute();
+  else if (isPressed(BUTTON_A)) buttonA_->execute();
+  else if (isPressed(BUTTON_B)) buttonB_->execute();
+}
+```
+> 这里没有去检测指针是否为NULL，因为我们假设了所有的按键都是有对应行为的。如果想支持不做任何事情的行为，直接定义一个excute()方法为空的类，并将按键的指针指向该类即可。这种模式被称为“空对象“。
+
+现在我们不再是直接的调用方法了，而是多了一层间接的映射。
+![](command-buttons-two.png)
+
+以上简短介绍了命令模式。如果你能看出该模式的好处，就接着看剩下的内容吧。
+
+## 角色操作
+我们刚才定义的类有一个很大的局限，我们假定了这些顶层的jump()、fireGun()等指令都能找到玩家角色，并对其进行操作。而这个假定限制了这些函数的参数对象，所以我们现在不要爱让这些函数去寻找对象，而是将对象作为参数传进去：
+```cpp
+class Command
+{
+public:
+  virtual ~Command() {}
+  virtual void execute(GameActor& actor) = 0;
+};
+```
+`GameActor`指的是游戏中的一个角色，我们将其传给execute()，继承的类就可以直接操作传递进去的对象了，就像这样：
+```cpp
+class JumpCommand : public Command
+{
+public:
+  virtual void execute(GameActor& actor)
+  {
+    actor.jump();
+  }
+};
+```
+现在，我们这个类可以让任意角色进行跳跃了。我们修改了handleInput(),让它返回命令。
+```cpp
+Command* InputHandler::handleInput()
+{
+  if (isPressed(BUTTON_X)) return buttonX_;
+  if (isPressed(BUTTON_Y)) return buttonY_;
+  if (isPressed(BUTTON_A)) return buttonA_;
+  if (isPressed(BUTTON_B)) return buttonB_;
+
+  // Nothing pressed, so do nothing.
+  return NULL;
+}
+```
+因为这里并没有actor参数，所以不能立即调用。这里也看到了命令模式的另一个好处，我们可以延迟到它执行时再调用。
+
+接着，我们需要一些代码来接收命令，并且传入具体的角色。
+```cpp
+Command* command = inputHandler.handleInput();
+if (command)
+{
+  command->execute(actor);
+}
+```
+假设actor是一个玩家角色的引用，这段代码能按照玩家的输入做出对应的行为。而通过这增加的一层重定向以及actor参数，我们可以通过改变actor参数，从而控制场景中任意一个角色。
+
+实际上，这个特性并不通用，但经常会出现一些类似的用例。目前我们只考虑了玩家控制的角色，但是对于其他的被AI控制的角色呢？我们也可以用相同的命令模式来连接AI引擎和角色，AI代码只要生成命令对象就可以了。
+
+
+
 
 
