@@ -181,13 +181,135 @@ private:
 };
 ```
 
-这看起来和之前的命令有所不同。
+这看起来和之前的命令有所不同。在上个例子中，我们抽象了命令给不同的角色使用。而这次我们只想将命令绑定到移动的单位上，这条命令并不是移动某个物体，而是回合制游戏中的一次具体的移动。
 
+这展现了命令模式的另一个使用场景，在一些情况下，比如前面的例子，指令是一个可重用对象，表示一个可执行事件。我们之前的输入处理会就是在按键时调用对应命令对象的execute方法。
 
+这里的命令更加特殊一些，表示了在特定时间点能做的事件。意味着输入处理代码会在任何玩家决定移动的时候，都会创建一个命令实例，如下：
+```c++
+Command* handleInput()
+{
+  Unit* unit = getSelectedUnit();
 
+  if (isPressed(BUTTON_UP)) {
+    // 向上移动单位
+    int destY = unit->y() - 1;
+    return new MoveUnitCommand(unit, unit->x(), destY);
+  }
 
+  if (isPressed(BUTTON_DOWN)) {
+    // 向下移动单位
+    int destY = unit->y() + 1;
+    return new MoveUnitCommand(unit, unit->x(), destY);
+  }
 
+  // 其他的移动……
 
-## 类和函数
+  return NULL;
+}
+```
+
+然而这些命令只能使用一次，为了让命令可撤销，我们在基类中定义了一个操作undo，所有子类都要实现该方法。
+
+```c++
+class Command
+{
+public:
+  virtual ~Command() {}
+  virtual void execute() = 0;
+  virtual void undo() = 0;
+};
+```
+
+undo()方法回滚了对应execute方法做的操作。这是支持了undo操作的移动指令。
+```c++
+class MoveUnitCommand : public Command
+{
+public:
+  MoveUnitCommand(Unit* unit, int x, int y)
+  : unit_(unit),
+    xBefore_(0),
+    yBefore_(0),
+    x_(x),
+    y_(y)
+  {}
+
+  virtual void execute()
+  {
+    // Remember the unit's position before the move
+    // so we can restore it.
+    xBefore_ = unit_->x();
+    yBefore_ = unit_->y();
+
+    unit_->moveTo(x_, y_);
+  }
+
+  virtual void undo()
+  {
+    unit_->moveTo(xBefore_, yBefore_);
+  }
+
+private:
+  Unit* unit_;
+  int xBefore_, yBefore_;
+  int x_, y_;
+};
+```
+
+在这里我们给类添加了一些状态，因为当一个单位移动时，它就会忘了它曾经的状态。如果我们希望能够撤销这次移动，我们就需要通过`xBefore_`和`yBefore_`记住自己移动之前的位置。
+
+为了让玩家能够撤销移动，我们记录了最后一条执行的命令，当他按下Ctrl-Z，我们就调用undo方法。(如果他已经执行了撤销，那么就变成redo，我们重新调用命令的execute方法。)
+
+支持连续的undo操作也不难，我们只需要记录一个命令列表以及一个指向当前命令的指针即可。当玩家执行一条命令，我们将命令加到列表尾部，并且将当前命令指针指向它即可。
+
+![](img/command-undo.png)
+
+当玩家选择了"undo"操作，我们undo当前的指令并且将current回退一格，而当玩家选择了"Redo"操作，我们将指针指向下一条指令并且执行该命令。如果他在undo了一些指令后执行了一条新的指令，那么列表中当前指令之后的指令都会被废弃掉。
+
+当我第一次在关卡编辑器中使用的时候，我感觉自己就是一个天才，我惊异于该模式的直接有效。它规定所有的操作都要通过一个指令来完成，只要你做到了这点，剩下的事情都很简单了。
+
+## 类还是函数?
+
+前面我说命令很想first-class函数或者闭包，但是我给出的例子都是使用类来完成的。如果你对函数式编程很熟悉，你可能会疑惑函数在哪。
+
+我这样实现是因为c++对first-class的支持十分有限。函数指针是无状态的，仿函数比较怪异并且仍需要创建类，而C++11的lambda表达式因为手动的内存管理，也需要小心使用。
+
+这不是说你不能在其他的语言中使用函数来实现命令模式。如果你使用语言具有闭包特性，那就使用它吧。可以说，在某种程度上，命令模式正是为一些没有闭包特性的语言模拟闭包。（有时候即使有闭包，也要将命令封装成类。对于包含多种操作的命令（比如可撤销的命令），只将它对应成一个函数是不够的。）
+
+举个例子，使用javascript，我们可以这样构造一个移动指令：
+```cpp
+function makeMoveUnitCommand(unit, x, y) {
+  // This function here is the command object:
+  return function() {
+    unit.moveTo(x, y);
+  }
+}
+```
+
+我们也可以通过一对闭包操作来支持撤销操作：
+```c++
+function makeMoveUnitCommand(unit, x, y) {
+  var xBefore, yBefore;
+  return {
+    execute: function() {
+      xBefore = unit.x();
+      yBefore = unit.y();
+      unit.moveTo(x, y);
+    },
+    undo: function() {
+      unit.moveTo(xBefore, yBefore);
+    }
+  };
+}
+```
+
+如果你习惯了函数式，这样实现十分子然。如果没有，我希望该节可以让你了解一些。对我来说，在命令模式上的实用性，展示了函数式编程在很多问题中都是十分有效的。
+
+## 参见
+- 你最终会定义很多命令类。为了实现的简单一些，可以定义一个具体的基类包含一些方便的高层方法，在派生类中去使用它们。这会将命令的主要execute方法转到子类沙箱模式中。
+
+- 在我们的例子中，我们明确的指出了可处理命令的角色。在某些情况下，尤其当对象是分层时，也可以不必这样做。对象可以响应命令，也可以将命令交给所属的对象，这也是所谓的责任链模式。
+
+- 有些命令式无状态的简单行为，比如前面的JumpCommand。这种情况下，创建多个实例是浪费内存的行为，享元模式可以处理该情况。
 
 
